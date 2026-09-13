@@ -1,0 +1,61 @@
+{
+  "name": "proplab-mcp-server",
+  "mcpName": "io.github.Khavel/proplab",
+  "version": "1.0.0",
+  "description": "MCP server for NBA Prop Lab — NBA and WNBA player-prop picks scored by a 7-block model, a public track record, backtests, player research and daily games",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "proplab-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "server.json"
+  ],
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "nba",
+    "wnba",
+    "basketball",
+    "player-props",
+    "sports-betting",
+    "predictions",
+    "track-record",
+    "sports-data"
+  ],
+  "homepage": "https://nbaproplab.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Khavel/proplab-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Khavel/proplab-mcp/issues"
+  },
+  "license": "MIT",
+  "author": "Khavel",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Khavel/proplab",
+  "title": "NBA Prop Lab",
+  "description": "NBA and WNBA player-prop picks scored by a 7-block model, graded in public: track record, daily board, backtests, player research.",
+  "websiteUrl": "https://nbaproplab.com",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/Khavel/proplab-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "proplab-mcp-server",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PROPLAB_API_URL",
+          "description": "API base URL. Defaults to https://nbaproplab.com.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PROPLAB_API_KEY",
+          "description": "Bearer API key from nbaproplab.com → Account → API keys. Optional: the public tools — track record, daily dashboard, games, player search, system status — work without it.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

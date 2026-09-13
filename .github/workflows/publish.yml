@@ -1,0 +1,98 @@
+# Publishes a release of this server: the npm package and the entry in the official MCP registry.
+#
+# Why here and not from a laptop: the registry authenticates with GitHub's OIDC token, which this
+# workflow already has, so nobody has to install the publisher CLI or run a browser login. Tag a
+# version and both registries are updated.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# npm needs one credential because the account has 2FA. Either:
+#   (a) a *granular access token* with "bypass 2FA" (npmjs.com → Access Tokens) stored as the
+#       NPM_TOKEN repository secret, or
+#   (b) trusted publishing, no token at all, once this is run from a logged-in npm CLI:
+#       npm trust github proplab-mcp-server --repo Khavel/proplab-mcp --file publish.yml --allow-publish
+# If neither is configured the npm step fails and nothing reaches the registry (it refuses an
+# entry whose npm version does not exist).
+#
+# Copied from Khavel/futpicks-mcp (2026-09-06), where the same circuit has been running since v1.0.2.
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC token for the MCP registry (and for npm trusted publishing)
+      contents: read
+
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # The tag is the source of truth for the version, so package.json and server.json cannot
+      # drift from what is being released.
+      - name: Check the tag matches the manifests
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          srv="$(node -p "require('./server.json').version")"
+          nested="$(node -p "require('./server.json').packages[0].version")"
+          echo "tag=$tag package.json=$pkg server.json=$srv package entry=$nested"
+          test "$tag" = "$pkg" -a "$tag" = "$srv" -a "$tag" = "$nested" \
+            || { echo "::error::the tag and the manifest versions disagree"; exit 1; }
+
+      # The version check keeps the job green when the release was already pushed by hand.
+      - name: Publish to npm
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          if npm view "proplab-mcp-server@$version" version >/dev/null 2>&1; then
+            echo "proplab-mcp-server@$version ya está en npm, no hay nada que publicar"
+          else
+            npm publish --provenance --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # The registry refuses the entry until it can see the version on npm.
+      - name: Wait for npm to serve the new version
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          for attempt in $(seq 1 30); do
+            if [ -n "$(npm view "proplab-mcp-server@$version" version 2>/dev/null)" ]; then
+              echo "proplab-mcp-server@$version visible en npm (intento $attempt)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::npm sigue sin servir proplab-mcp-server@$version tras cinco minutos"
+          exit 1
+
+      - name: Install the MCP registry publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Publish to the MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
