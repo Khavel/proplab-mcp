@@ -1,0 +1,54 @@
+# Publishes ONLY the remote server (https://nbaproplab.com/mcp) to the official MCP registry,
+# without the npm package.
+#
+# Why (2026-10-22): publish.yml publishes npm first and the registry refuses an entry whose npm
+# version does not exist; the npm package is still waiting for its credential (NPM_TOKEN or
+# trusted publishing). A remote-only entry needs neither: the registry accepts server.json with
+# "remotes" and no "packages", and authenticates the io.github.Khavel namespace with this
+# workflow's GitHub OIDC token. Directories that mirror the registry (Glama, PulseMCP, mcp.so)
+# pick it up from there.
+#
+# Versions are immutable in the registry, so this run uses a prerelease of the manifest version
+# (default 1.0.0-remote): semver sorts it before 1.0.0, and the full npm release later becomes
+# "latest" without any clash.
+#
+#   gh workflow run publish-remote.yml -R Khavel/proplab-mcp
+name: Publish remote server to the MCP registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Registry version for this remote-only entry (must be new)"
+        required: true
+        default: "1.0.0-remote"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC token for the MCP registry
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the remote-only manifest
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          jq --arg v "$VERSION" 'del(.packages) | .version = $v' server.json > server.remote.json
+          jq -e '(.remotes | length) > 0 and (.description | length) <= 100' server.remote.json >/dev/null \
+            || { echo "::error::server.json needs remotes and a description of at most 100 characters"; exit 1; }
+          cat server.remote.json
+
+      - name: Install the MCP registry publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Publish to the MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish server.remote.json

@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Khavel/proplab",
   "title": "NBA Prop Lab",
-  "description": "NBA and WNBA player-prop picks scored by a 7-block model, graded in public: track record, daily board, backtests, player research.",
+  "description": "NBA and WNBA player-prop analytics: daily board, graded track record, matchup and referee data.",
   "websiteUrl": "https://nbaproplab.com",
   "version": "1.0.0",
   "repository": {
