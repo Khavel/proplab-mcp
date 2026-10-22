@@ -1,52 +1,73 @@
-# NBA Prop Lab MCP Server
+# PropLab MCP Server
 
-Model Context Protocol server for NBA and WNBA **player props**: the picks of a 7-block scoring
-model, graded in public against the official box score, plus the daily board, backtests, player
-research and the day's games.
+Model Context Protocol server for [PropLab](https://nbaproplab.com): NBA and WNBA **player-prop
+analytics**. You get the daily board the model publishes before tip-off, its public record graded
+against the official box score, defense vs position, usage, referees and player research.
 
-Every tool calls the public [nbaproplab.com](https://nbaproplab.com) REST API over HTTPS. No
-database access, no shell, no local secrets beyond the API key you put in the environment.
-**The track record, daily dashboard, games, player search and status tools need no key at all.**
+There are two ways to use it:
 
-The record the tools report is measured, not claimed: every pick is published before tip-off and
-settled afterwards — the same figures as [nbaproplab.com/track-record](https://nbaproplab.com/track-record).
+- **Remote server: works now, nothing to install, no key.** `https://nbaproplab.com/mcp`
+- **Local stdio package**, built from this repository. It adds backtests and on-demand pick
+  evaluation, which need an API key. It is not yet published on npm.
 
-## Quick start
+The data is informational sports analysis, not betting advice. PropLab does not take wagers,
+link to sportsbooks or guarantee outcomes, and past results do not predict future ones.
 
-Add it to any MCP client (Claude Code shown here) — no install step, `npx` fetches it:
+## Remote server (recommended)
 
-```json
-{
-  "mcpServers": {
-    "proplab": {
-      "command": "npx",
-      "args": ["-y", "proplab-mcp-server"]
-    }
-  }
-}
+Streamable HTTP, stateless, no authentication. Every tool is read-only and returns the same public
+data shown on nbaproplab.com.
+
+**Claude (claude.ai, desktop, mobile):** Settings → Connectors → Add custom connector. Name:
+`PropLab`. URL: `https://nbaproplab.com/mcp`. Authentication: none.
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http proplab https://nbaproplab.com/mcp
 ```
 
-Then ask for today's board: `proplab_dashboard` for the slate and its top picks,
-`proplab_track_record` for how the model has done (by league, tier, stat and date range),
-`proplab_games` for who plays today.
+**Codex:**
 
-To unlock the research and backtest tools, add the key:
-
-```json
-{
-  "mcpServers": {
-    "proplab": {
-      "command": "npx",
-      "args": ["-y", "proplab-mcp-server"],
-      "env": {
-        "PROPLAB_API_KEY": "…"
-      }
-    }
-  }
-}
+```bash
+codex mcp add proplab --url https://nbaproplab.com/mcp
 ```
 
-## Building from source
+or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.proplab]
+url = "https://nbaproplab.com/mcp"
+```
+
+Any other client that supports streamable HTTP can point at the same URL.
+
+### Tools
+
+| Tool | Parameters | Returns |
+|------|------------|---------|
+| `daily_board` | `league` (`nba` or `wnba`) | The published player-prop board for the next slate (player, stat, line, direction, tier, model score) and how the previous board settled |
+| `track_record` | `league?`, `tier?` (`Premium` or `Standard`), `from?`, `to?` | Settled record by tier and stat. The published record is the Premium tier (`premiumHitRate`, `goodPicks`) and Standard (`marginalPicks`); `overall*` fields also count internal ratings that are never published. Dates before 2026-04-03 are a backtest |
+| `defense_vs_position` | `league` | Points, rebounds and assists each team allows to guards, forwards and centers relative to the league average, with defensive rating, pace and ranks |
+| `usage_leaders` | `league` | Players ranked by usage rate this season, with last-10-games usage, minutes and points |
+| `nba_today` | — | Today's NBA games with tip-off times, yesterday's scores and the standings |
+| `games` | `date?` (`yyyy-MM-dd`) | NBA and WNBA games on a date (default: today, US Eastern) |
+| `referee_assignments_today` | — | The crew of each NBA game today, once the league publishes it the morning of game day |
+| `referees` | — | NBA referees this season with games worked and fouls per game against the league average |
+| `search_players` | `query` | NBA and WNBA players by name, accents optional ("Jokic" finds Jokić) |
+| `player_research` | `playerId` | Recent game logs, current prop lines across books with hit rates, injury status, next-game context and the model's picks on that player |
+
+Example prompts:
+
+- "Which NBA teams allow the most rebounds to centers, and do any of them play today?"
+- "How has PropLab's published Premium tier done in the WNBA since April, by stat?"
+- "Search for Jokic and show his last 10 games and injury status."
+
+Invalid arguments, for example `league: "nfl"`, return a tool error that explains the valid values.
+
+## Local stdio package
+
+Not yet published on npm, so build it from this repository:
 
 ```bash
 git clone https://github.com/Khavel/proplab-mcp.git
@@ -55,25 +76,38 @@ npm install
 npm run build      # compiles src/index.ts → dist/index.js
 ```
 
-For local development with hot reload: `npm run dev`.
+Then register it in your MCP client with the absolute path to the build:
 
-## Environment variables
+```json
+{
+  "mcpServers": {
+    "proplab": {
+      "command": "node",
+      "args": ["/absolute/path/to/proplab-mcp/dist/index.js"],
+      "env": {
+        "PROPLAB_API_KEY": "…"
+      }
+    }
+  }
+}
+```
+
+`PROPLAB_API_KEY` is optional: without it the public tools still work. For local development
+with hot reload, run `npm run dev`.
+
+### Environment variables
 
 | Variable | Required for | Description |
 |----------|--------------|-------------|
 | `PROPLAB_API_URL` | No | API base URL (default: `https://nbaproplab.com`) |
-| `PROPLAB_API_KEY` | Research and backtest tools | Bearer API key |
+| `PROPLAB_API_KEY` | Backtest, pick and research tools | Bearer API key |
 
-Public tools work with no key at all.
+The key is minted at **nbaproplab.com → Account → API keys**. It is shown once at creation and can
+be revoked from the same screen.
 
-### Where to get the key
+### Tools
 
-Mint it from the web app: **nbaproplab.com → Account → API keys**. The raw key is shown once at
-creation; keys can be revoked from the same screen.
-
-## Tools
-
-### Public (no auth)
+Public, no key:
 
 | Tool | Endpoint | Key params |
 |------|----------|------------|
@@ -83,7 +117,7 @@ creation; keys can be revoked from the same screen.
 | `proplab_search_players` | `GET /api/v1/players/search` | `q` |
 | `proplab_system_status` | `GET /api/v1/health` | — |
 
-### With `PROPLAB_API_KEY`
+With `PROPLAB_API_KEY`:
 
 | Tool | Endpoint | Key params |
 |------|----------|------------|
@@ -95,26 +129,27 @@ creation; keys can be revoked from the same screen.
 | `proplab_evaluate_pick` | `POST /api/v1/picks/evaluate` | `playerName`, `statType`, `line`, `direction`, `opponentTeam?` |
 | `proplab_player_research` | `GET /api/v1/research/player/{playerId}` | `playerId` |
 
-Public JSON the site also exposes without a key, readable with any HTTP tool: the daily board
-(`/api/v1/seo/board?league=nba|wnba`), defense vs position (`/api/v1/seo/defense-vs-position`),
-usage-rate leaders (`/api/v1/seo/usage-leaders`), referee assignments (`/api/v1/seo/referees/today`)
-and the day's slate with standings (`/api/v1/seo/nba-hoy`). See
-[nbaproplab.com/llms.txt](https://nbaproplab.com/llms.txt).
-
-## Verify locally
+### Verify locally
 
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
-Then call `proplab_system_status` (no key needed) — it should return live system status.
+Then call `proplab_system_status`, which needs no key and should return the live system status.
 
-## Security
+## Data and privacy
 
-- No tool reads database connection strings, app settings or shells into a server.
-- All inputs are validated with zod; responses are truncated at 40 000 characters.
-- The key is read from the environment only and never logged.
-- Authenticated tools fail with a clear message when the key is missing — they never fall back to
-  an unauthenticated call.
-- Every tool is read-only except `proplab_evaluate_pick`, which scores a hypothetical pick and
-  stores nothing.
+- **Remote server:** it keeps no state and stores nothing from your conversations. It only receives
+  the arguments of each tool call (a league, a date, a player name or id), and the web server
+  keeps its standard access logs.
+- **Local package:** it calls the public nbaproplab.com API over HTTPS and reads the key only from
+  the environment, never logging it. No tool reads database credentials or app settings, or opens
+  a shell.
+- Inputs are validated with zod and responses are truncated at 40,000 characters. Every tool is
+  read-only except `proplab_evaluate_pick`, which scores a hypothetical pick and stores nothing.
+- Privacy policy: [nbaproplab.com/legal/privacy](https://nbaproplab.com/legal/privacy).
+  Responsible gambling: [nbaproplab.com/responsible-gambling](https://nbaproplab.com/responsible-gambling).
+
+## Support
+
+Open an issue at [github.com/Khavel/proplab-mcp/issues](https://github.com/Khavel/proplab-mcp/issues).

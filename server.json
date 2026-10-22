@@ -9,6 +9,12 @@
     "url": "https://github.com/Khavel/proplab-mcp",
     "source": "github"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://nbaproplab.com/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
